@@ -10,15 +10,31 @@ def index():
     return {"name": "First Data"}
 
 
-@app.post("/uploadfile/")
+@app.post("/randomsample/")
+async def generate_samples(samples: int = Form(default=1), ratio: float = Form(default=0.75), csv_file: UploadFile = File(...)):
+    print(samples, csv_file)
+    population = pd.read_csv(csv_file.file)
+    train = population.sample(frac=ratio)
+    train.to_csv('1_train.csv', encoding='utf-8')
+    remaining_population = population.loc[~population.index.isin(train.index), :]
+    remaining_samples = samples-1
+    for i in range(1, remaining_samples + 1):
+        test = remaining_population
+        test = test.sample(frac=i/remaining_samples)
+        test.to_csv(f'{i}_test.csv', encoding='utf-8')
+        remaining_population = remaining_population.loc[~remaining_population.index.isin(test.index), :]
+    return {"message": f'{samples} sample created'}
+
+
+@app.post("/sklearnsample/")
 async def create_upload_file(response: str = Form(...), algo: str = Form(...), stratify_col: str = Form(default=''),
                              csv_file: UploadFile = File(...)):
-    vehicles = pd.read_csv(csv_file.file)
+    population = pd.read_csv(csv_file.file)
     # response = 'co2emissions'
-    y = vehicles[[response]]
-    predictors = list(vehicles.columns)
+    y = population[[response]]
+    predictors = list(population.columns)
     predictors.remove(response)
-    x = vehicles[predictors]
+    x = population[predictors]
     if algo == "simple":
         x_train, x_test, y_train, y_test = train_test_split(x, y, random_state=1234)
     else:
